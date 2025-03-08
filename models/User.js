@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const { number } = require("joi");
 const { Schema, model } = require("mongoose");
 const userSchema = new Schema({
@@ -27,7 +26,7 @@ const userSchema = new Schema({
         type: String,
         required: true,
         minlength: 2,
-        // TODO: check if need to add state, city, country, street, hoseNO & zip code
+        // TODO: add state, city, country, street, hoseNO & zip code in a object
     },
     isAdmin: {
         type: Boolean,

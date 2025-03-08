@@ -9,7 +9,7 @@ const _ = require("lodash");
 const router = express.Router();
 
 const cardSchema = Joi.object({
-    cardImage: Joi.string().required().url(),
+    cardImage: Joi.string().required().min(2),
     cardAlt: Joi.string().required().min(2),
     cardTitle: Joi.string().required().min(8),
     cardSubtitle: Joi.string().required().min(8),

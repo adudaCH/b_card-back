@@ -1,6 +1,7 @@
+const mongoose = require("mongoose");
+
 const { number } = require("joi");
 const { Schema, model } = require("mongoose");
-const mongoose = require("mongoose");
 const userSchema = new Schema({
     name: {
         type: String,

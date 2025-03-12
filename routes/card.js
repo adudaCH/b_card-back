@@ -119,4 +119,7 @@ router.get("/:id", auth, async (req, res) => {
     }
 }); 
 
+
+// TODO: make a request for the cards & userID
+
 module.exports = router;

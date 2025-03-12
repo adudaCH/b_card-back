@@ -22,24 +22,20 @@ router.post("/", async (req, res) => {
         // 1. body validation
         const { error } = registerSchema.validate(req.body);
         if (error) return res.status(400).send(error.details[0].message);
-
         // 2. check for existing user
         let user = await User.findOne({ email: req.body.email });
         if (user) return res.status(400).send("User already exists");
-
         // 3. create user + encrypt password
         user = new User(req.body);
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
         await user.save();
-
         // 3.5 create card
         const card = new Card({ userId: user._id, products: [], active: true });
         await card.save();
-
         // 4. create token
         const token = jwt.sign(
-            { _id: user._id, isAdmin: user.isAdmin},
+            { _id: user._id, isAdmin: user.isAdmin },
             process.env.JWTKEY
         );
         res.status(201).send(token);
@@ -60,17 +56,14 @@ router.post("/login", async (req, res) => {
         const { error } = loginSchema.validate(req.body);
         console.error(error, "err");
         if (error) return res.status(400).send(error.details[0].message);
-
         // 2. check if user exists
         const user = await User.findOne({ email: req.body.email });
         if (!user)
             return res.status(400).send("Email or password are incorrect");
-
         // 3. compare the password
         const result = await bcrypt.compare(req.body.password, user.password);
         if (!result)
             return res.status(400).send("Email or password are incorrect");
-
         // 4. create token
         const token = jwt.sign(
             { _id: user._id, isAdmin: user.isAdmin },
@@ -94,26 +87,77 @@ router.get("/profile", auth, async (req, res) => {
     }
 });
 
-// router.put("/", auth, async (req, res) => {
-//     const errors = validationResult(req);
-//     if (!errors.isEmpty()) {
-//         return res.status(400).json({ errors: errors.array() });
-//     }
-//     try {
-//         const updatedProduct = await Product.findByIdAndUpdate(
-//             req.params.id,
-//             req.body,
-//             { new: true, runValidators: true }
-//         );
+// Change isBusiness status of a registered user
+router.patch("/:id", auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // search  user by ID
+        const user = await User.findById(id);
+        if (!user) return res.status(404).send("User not found");
+        // change statues to isBusiness
+        user.isBusiness = !user.isBusiness;
+        await user.save();
+        res.status(200).send({ message: "User business status updated", user });
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
 
-//         if (!updatedProduct) {
-//             return res.status(404).json({ message: "Product not found" });
-//         }
+// Edit user details (only the user can update)
+router.put("/:id", auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // check if it the same user
+        if (req.payload.userId !== id) {
+            return res.status(403).send("Access denied.");}
+        // update user details
+        const updatedUser = await User.findByIdAndUpdate(id, req.body, {
+            new: true,
+            runValidators: true,});
+        if (!updatedUser) return res.status(404).send("User not found");
+        res.status(200).send({
+            message: "User updated successfully",
+            user: updatedUser,
+        });
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
 
-//         res.status(200).json(updatedProduct);
-//     } catch (error) {
-//         res.status(500).json({ message: "Server error", error });
-//     }
-// });
-// TODO: make a request for the cards
+router.get("/", auth, async (req, res) => {
+    try {
+        // check if admin
+        if (!req.payload.isAdmin) {
+            return res.status(403).send("Access denied.");
+        }
+        // search users in the database 
+        const users = await User.find();
+        res.status(200).send(users);
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+router.get("/:id", auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        //search user by ID
+        const user = await User.findById(id);
+        if (!user) return res.status(404).send("User not found");
+
+        // only register users  and admin are authorized 
+        if (req.payload.userId !== id && !req.payload.isAdmin) {
+            return res.status(403).send("Access denied.");
+        }
+
+        res.status(200).send(user);
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+
+
+
 module.exports = router;

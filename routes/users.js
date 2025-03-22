@@ -16,7 +16,7 @@ const registerSchema = Joi.object({
     isBusiness: Joi.boolean().required(),
 });
 
-// register
+// 1. register **
 router.post("/", async (req, res) => {
     try {
         // 1. body validation
@@ -49,7 +49,7 @@ const loginSchema = Joi.object({
     password: Joi.string().required().min(8),
 });
 
-// login
+// 2. login
 router.post("/login", async (req, res) => {
     try {
         // 1. body validation
@@ -75,19 +75,65 @@ router.post("/login", async (req, res) => {
     }
 });
 
-// profile
-router.get("/profile", auth, async (req, res) => {
+// 3. get all users
+router.get("/", auth, async (req, res) => {
     try {
-        const user = await User.findById(req.payload._id);
-        if (!user) return res.status(404).send("No such user");
-        res.status(200).send(_.pick(user, ["_id", "email", "name", "isAdmin"]));
+        // check if admin
+        if (!req.payload.isAdmin) {
+            return res.status(403).send("Access denied.");
+        }
+        // search users in the database
+        const users = await User.find();
+        res.status(200).send(users);
     } catch (error) {
-        console.log(error, "err 400");
         res.status(400).send(error);
     }
 });
 
-// Change isBusiness status of a registered user
+//4. The registered user or admin
+router.get("/:id", auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        //search user by ID
+        const user = await User.findById(id);
+        if (!user) return res.status(404).send("User not found");
+
+        // only register users  and admin are authorized
+        if (req.payload.userId !== id && !req.payload.isAdmin) {
+            return res.status(403).send("Access denied.");
+        }
+
+        res.status(200).send(user);
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+// 5. Edit user details (only the user can update)
+router.put("/:id", auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // check if it the same user
+        if (req.payload.userId !== id) {
+            return res.status(403).send("Access denied.");
+        }
+        // update user details
+        const updatedUser = await User.findByIdAndUpdate(id, req.body, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updatedUser) return res.status(404).send("User not found");
+        res.status(200).send({
+            message: "User updated successfully",
+            user: updatedUser,
+        });
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+//6. Change isBusiness status of a registered user
 router.patch("/:id", auth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -103,61 +149,37 @@ router.patch("/:id", auth, async (req, res) => {
     }
 });
 
-// Edit user details (only the user can update)
-router.put("/:id", auth, async (req, res) => {
+//7. delete user
+router.delete("/:id", auth, async (req, res) => {
     try {
-        const { id } = req.params;
-        // check if it the same user
-        if (req.payload.userId !== id) {
-            return res.status(403).send("Access denied.");}
-        // update user details
-        const updatedUser = await User.findByIdAndUpdate(id, req.body, {
-            new: true,
-            runValidators: true,});
-        if (!updatedUser) return res.status(404).send("User not found");
-        res.status(200).send({
-            message: "User updated successfully",
-            user: updatedUser,
-        });
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+        // Ensure user is logged in
+        if (!req.payload.loggedIn) return res.status(401).send("Access denied");
 
-router.get("/", auth, async (req, res) => {
-    try {
-        // check if admin
-        if (!req.payload.isAdmin) {
-            return res.status(403).send("Access denied.");
+        // Allow only the user themselves or an admin to delete the account
+        if (req.payload._id !== req.params.id && !req.payload.isAdmin) {
+            return res.status(403).send("Access denied");
         }
-        // search users in the database 
-        const users = await User.find();
-        res.status(200).send(users);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
 
-router.get("/:id", auth, async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        //search user by ID
-        const user = await User.findById(id);
+        // Find and delete the user
+        const user = await User.findByIdAndDelete(req.params.id);
         if (!user) return res.status(404).send("User not found");
 
-        // only register users  and admin are authorized 
-        if (req.payload.userId !== id && !req.payload.isAdmin) {
-            return res.status(403).send("Access denied.");
-        }
-
-        res.status(200).send(user);
+        res.status(200).send("User deleted successfully");
     } catch (error) {
-        res.status(400).send(error);
+        res.status(400).send(error.message);
     }
 });
 
-
-
+//? profile
+router.get("/profile", auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.payload._id);
+        if (!user) return res.status(404).send("No such user");
+        res.status(200).send(_.pick(user, ["_id", "email", "name", "isAdmin"]));
+    } catch (error) {
+        console.log(error, "err 400");
+        res.status(400).send(error);
+    }
+});
 
 module.exports = router;

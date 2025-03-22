@@ -15,110 +15,141 @@ const cardSchema = Joi.object({
     cardSubtitle: Joi.string().required().min(8),
 });
 
-// add a new card
-router.post("/", auth, async (req, res) => {
+// TODO: 1. get all cards
+
+//2. my cards
+router.get("/my-cards", auth, async (req, res) => {
     try {
-        
-        // check if user is logged in
+        // Ensure user is logged in
         if (!req.payload.loggedIn) return res.status(401).send("Access denied");
 
-        // check if user is Business (but don't block normal users)
-        if (!req.payload.isBusiness) {
-            // Here you can perform additional actions if necessary for normal users
-            // For example, check if they are allowed to add the card or if specific data is required for normal users.
-        }
-        // body validation
-        const {error} = cardSchema.validate(req.body);
+        // Find all cards created by the logged-in user
+        const cards = await Card.find({ userId: req.payload._id });
+
+        res.status(200).send(cards);
+    } catch (error) {
+        res.status(400).send(error.message);
+    }
+});
+
+// 3. get card  //? every one can search
+router.get("/:id", async (req, res) => {
+    try {
+        // Check if card exists
+        const card = await Card.findById(req.params.id);
+        if (!card) return res.status(404).send("No such card");
+
+        res.status(200).send(card);
+    } catch (error) {
+        res.status(400).send(error.message);
+    }
+});
+
+// 4. create a new card (business users only)
+router.post("/", auth, async (req, res) => {
+    try {
+        // Check if user is logged in
+        if (!req.payload.loggedIn) return res.status(401).send("Access denied");
+
+        // Allow only business users to create a card
+        if (!req.payload.isBusiness)
+            return res.status(403).send("Only business users can create cards");
+
+        // Body validation
+        const { error } = cardSchema.validate(req.body);
         if (error) return res.status(400).send(error.details[0].message);
 
-        // add card
-        const card = new Card(req.body);
+        // Add card
+        const card = new Card({ ...req.body, userId: req.payload._id });
         await card.save();
         res.status(201).send("Card has been added successfully :)");
     } catch (error) {
-        res.status(400).send(error);
+        res.status(400).send(error.message);
     }
 });
 
-
-// edit card
+// 5. edit card
 router.put("/:cardId", auth, async (req, res) => {
     try {
-        // check if user is admin or business
-        if (!req.payload.isAdmin && !req.payload.isBusiness) return res.status(400).send("Access denied");
+        // Fetch the card from the database
+        const card = await Card.findById(req.params.cardId);
+        if (!card) return res.status(404).send("Card not found");
 
-        // body validation
-        // check if product exists + update
+        // Check if the user is the creator of the card
+        if (card.userId.toString() !== req.payload._id) {
+            return res.status(403).send("Access denied");
+        }
+
+        // Update the card (assuming validation is done separately)
+        const updatedCard = await Card.findByIdAndUpdate(
+            req.params.cardId,
+            req.body,
+            { new: true }
+        );
+        res.send(updatedCard);
     } catch (error) {
-        res.status(400).send(error);
+        res.status(400).send(error.message);
     }
 });
 
+//6. like card
+router.patch("/:id/like", auth, async (req, res) => {
+    try {
+        // Check if user is logged in
+        if (!req.payload.loggedIn) return res.status(401).send("Access denied");
 
-// delete
+        // Find the card
+        const card = await Card.findById(req.params.id);
+        if (!card) return res.status(404).send("No such card");
+
+        // Check if user already liked the card
+        const userId = req.payload._id;
+        const index = card.likes.indexOf(userId);
+
+        if (index === -1) {
+            // If user hasn't liked the card, add like
+            card.likes.push(userId);
+        } else {
+            // If user already liked, remove like (toggle)
+            card.likes.splice(index, 1);
+        }
+
+        await card.save();
+        res.status(200).send(card);
+    } catch (error) {
+        res.status(400).send(error.message);
+    }
+});
+
+// 7. delete
 router.delete("/:cardId", auth, async (req, res) => {
     try {
         const { cardId } = req.params;
-        
+
         // find the card by its ID
         const card = await Card.findById(cardId);
-        
+
         if (!card) return res.status(404).send("Card not found");
 
         // check if user is admin or the card owner
-        if (req.payload.isAdmin || card.userId.toString() === req.payload.userId) {
+        if (
+            req.payload.isAdmin ||
+            card.userId.toString() === req.payload.userId
+        ) {
             // delete the card
             await card.remove();
             res.status(200).send("Card has been deleted successfully.");
         } else {
-            return res.status(403).send("Access denied: You are not authorized to delete this card.");
+            return res
+                .status(403)
+                .send(
+                    "Access denied: You are not authorized to delete this card."
+                );
         }
     } catch (error) {
         res.status(400).send(error);
     }
 });
-
-// ! only users can search!!!!!!!!!!!!
-
-// find card
-router.get("/:id", auth, async (req, res) => {
-    try {
-        // check if user is logged in
-        if (!req.payload.loggedIn) return res.status(401).send("Access denied");
-
-        // check if card exists
-        const card = await Card.findById(req.params.id);
-        if (!card) return res.status(400).send("No such card");
-
-        res.status(200).send(card);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
-
-// ? not sure what for
-router.get("/", auth, async (req, res) => {
-    try {
-        const card = await Card.find({});
-        res.json(card);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
-
-// ? not sure what for #2
-
-router.get("/:id", auth, async (req, res) => {
-    try {
-        // check if card exists
-        const card = await Card.findById(req.params.id);
-        if (!card) return res.status(400).send("No such card");
-        res.status(200).send(card);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-}); 
-
 
 // TODO: make a request for the cards & userID
 

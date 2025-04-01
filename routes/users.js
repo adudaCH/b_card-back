@@ -9,11 +9,27 @@ const _ = require("lodash");
 const router = express.Router();
 
 const registerSchema = Joi.object({
-    name: Joi.string().required().min(2),
-    email: Joi.string().required().email().min(2),
+    name: Joi.object({
+        first: Joi.string().required().min(2),
+        middle: Joi.string(),
+        last: Joi.string().required().min(2),
+    }),
+    isBusiness: Joi.boolean(),
+    phone: Joi.string().required().min(10).max(10),
+    email: Joi.string().required().email(),
+    address: Joi.object({
+        state: Joi.string().required(),
+        country: Joi.string().required(),
+        city: Joi.string().required(),
+        street: Joi.string().required(),
+        houseNumber: Joi.string().required(),
+        zipCode: Joi.number(),
+    }),
+    image: Joi.object({
+        url: Joi.string().required(),
+        alt: Joi.string().min(5),
+    }),
     password: Joi.string().required().min(8),
-    isAdmin: Joi.boolean().required(),
-    isBusiness: Joi.boolean().required(),
 });
 
 // 1. register **

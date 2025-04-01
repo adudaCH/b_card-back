@@ -9,11 +9,28 @@ const _ = require("lodash");
 const router = express.Router();
 
 const cardSchema = Joi.object({
-    cardImage: Joi.string().required().min(2),
-    cardAlt: Joi.string().required().min(2),
-    cardTitle: Joi.string().required().min(8),
-    cardSubtitle: Joi.string().required().min(8),
+    title: Joi.string().required().min(2).trim(),
+    subtitle: Joi.string().min(2).trim(),
+    description: Joi.string().required().min(10).trim(),
+    phone: Joi.string().required().pattern(/^[0-9]{10,15}$/).trim(),
+    email: Joi.string().required().email().trim(),
+    web: Joi.string().uri().allow("").trim(),
+    image: Joi.object({
+        url: Joi.string().uri().required(),
+        alt: Joi.string().required().min(2).trim()
+    }),
+    address: Joi.object({
+        state: Joi.string().min(2).trim().default("not defined"),
+        country: Joi.string().required().min(2).trim(),
+        city: Joi.string().required().min(2).trim(),
+        street: Joi.string().required().min(2).trim(),
+        houseNumber: Joi.number().required().min(1),
+        zip: Joi.number().min(0).default(0)
+    }),
+    likes: Joi.array().items(Joi.string().hex().length(24)).default([]),
+    userId: Joi.string().hex().length(24).required()
 });
+
 
 // TODO: 1. get all cards
 
